@@ -75,7 +75,8 @@ def getSubscriptionIndex(sender, receiver):
     return -1
 
 def handleUnsubscribeInternal(msg, sender, receiver):
-    if getSubscriptionIndex(sender, receiver) == -1:
+    index = getSubscriptionIndex(sender, receiver)
+    if index == -1:
         return bot.sendMessage(msg['chat']['id'], 'FAIL. NO SUCH SUBSCRIPTION')    
     del SETTING[sender][index]
     if len(SETTING[sender]) == 0:

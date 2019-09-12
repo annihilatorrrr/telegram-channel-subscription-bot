@@ -4,7 +4,7 @@ Subscribe messages between channels and groups.
 
 You are also welcome to use my [@channel_subscription_bot](https://t.me/channel_subscription_bot) without create your own bot.
 
-Feel free to use this free telegram bot at your own risk. Feedback/Feature requests is welcomed at [@dushufenxiang_chat](https://t.me/dushufenxiang_chat).
+Feedback/Feature requests is welcomed at [@dushufenxiang_chat](https://t.me/dushufenxiang_chat).
 
 Shared with a MIT license.
 
@@ -24,7 +24,7 @@ Then, you need to add the `TOKEN` file with your token.
 
 The next part is to install in your server the requirements of the bot using `pip3 install -r requirements.txt`.
 
-Finally, cadding it on all the relevent groups/channels, and talk to the bot to make subscription with them.
+Finally, adding it on all the relevent groups/channels, and talk to the bot to make subscription with them.
 
 ## notes
 
