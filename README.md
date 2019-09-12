@@ -4,9 +4,7 @@ Subscribe messages between channels and groups.
 
 You are also welcome to use my [@channel_subscription_bot](https://t.me/channel_subscription_bot) without create your own bot.
 
-Feedback/Feature requests is welcomed at [@dushufenxiang_chat](https://t.me/dushufenxiang_chat).
-
-Shared with a MIT license.
+Feedback / feature requests are welcomed at [@dushufenxiang_chat](https://t.me/dushufenxiang_chat).
 
 ## commands
 
