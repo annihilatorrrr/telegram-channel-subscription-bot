@@ -64,7 +64,7 @@ def formatAndCheckRoomId(roomId):
     try:
         result = bot.sendMessage(roomId, 'test') 
         bot.deleteMessage(telepot.message_identifier(result))
-        return result['chat']['id']
+        return str(result['chat']['id'])
     except:
         return None
 
@@ -132,7 +132,7 @@ def sendMessageDedup(receiver, msg):
     sended[message_identifier] = telepot.message_identifier(result)
 
 def handleGroup(msg):
-    for conf in CONFIG.get(msg['chat']['id'], []):
+    for conf in CONFIG.get(str(msg['chat']['id']), []):
         sendMessageDedup(conf['to'], msg)
 
 def handleLongChat(msg):
