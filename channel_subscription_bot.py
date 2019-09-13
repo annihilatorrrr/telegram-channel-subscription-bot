@@ -18,19 +18,19 @@ with open('TOKEN') as f:
 
 try:
     with open('CONFIG', 'r') as f:
-        SETTING = json.load(f)
+        CONFIG = json.load(f)
 except:
-    SETTING = {}
+    CONFIG = {}
 
 try:
     with open('STOP_SECRET', 'r') as f:
         STOP_SECRET = f.readline()
-except Exception:
+except:
     STOP_SECRET = 'stop'
 
-def saveSetting():
+def saveConfig():
     with open('CONFIG', 'w') as f:
-        f.write(json.dumps(SETTING, sort_keys=True, indent=2))
+        f.write(json.dumps(CONFIG, sort_keys=True, indent=2))
 
 HELP_WORDS = ['help', '帮助', 'start']
 
@@ -44,7 +44,7 @@ Both of the channels/groups should add this bot as admin.
 channel/group can be room ID or room name.
 '''
 
-ADMIN_CHAT_ID = '@dhsdjk' # debug
+ADMIN_CHAT_ID = -1001198682178
 
 LONG_TEXT_LIMIT = 300
 
@@ -55,22 +55,26 @@ def handleHelp(msg):
         return
     bot.sendMessage(msg['chat']['id'], HELP_MESSAGE)    
 
-def formatChatRoomId(roomId):
-    if len(roomId) > 0 and roomId[0] == '@':
-        return roomId
+def formatAndCheckRoomId(roomId):
     try:
         float(roomId)
-        return roomId
     except:
-        return '@' + roomId
+        if roomId and roomId[0] != '@':
+            roomId = '@' + roomId
+    try:
+        result = bot.sendMessage(roomId, 'test') 
+        bot.deleteMessage(telepot.message_identifier(result))
+        return result['chat']['id']
+    except:
+        return None
 
 def getSubscriptionIndex(sender, receiver):
-    if not sender in SETTING:
+    if not sender in CONFIG:
         return -1
-    for index, config in enumerate(SETTING[sender]):
-        if config['to'] == receiver:
+    for index, conf in enumerate(CONFIG[sender]):
+        if conf['to'] == receiver:
             break
-    if config['to'] == receiver:
+    if conf['to'] == receiver:
         return index
     return -1
 
@@ -78,30 +82,16 @@ def handleUnsubscribeInternal(msg, sender, receiver):
     index = getSubscriptionIndex(sender, receiver)
     if index == -1:
         return bot.sendMessage(msg['chat']['id'], 'FAIL. NO SUCH SUBSCRIPTION')    
-    del SETTING[sender][index]
-    if len(SETTING[sender]) == 0:
-        del SETTING[sender]  
-    saveSetting()          
+    del CONFIG[sender][index]
+    if len(CONFIG[sender]) == 0:
+        del CONFIG[sender]  
+    saveConfig()          
     bot.sendMessage(msg['chat']['id'], 'unsubscribe success') 
 
-def canSendMessage(roomId):
-    try:
-        result = bot.sendMessage(roomId, 'test') 
-        bot.deleteMessage(telepot.message_identifier(result))
-        return True
-    except Exception as e:
-        return False
-
 def handleSubscribeInternal(msg, sender, receiver):
-    if getSubscriptionIndex(sender, receiver) != -1:
-        return bot.sendMessage(msg['chat']['id'], 'WARING: subscription already exists.')    
-    for roomId in [sender, receiver]:
-        if not canSendMessage(roomId):
-            bot.sendMessage(msg['chat']['id'], 'CAN NOT SEND MESSAGE IN ' + roomId + '. Please add this bot into the channel/group and set as admin.')    
-            return
-    SETTING[sender] = SETTING.get(sender, [])
-    SETTING[sender].append({'to': receiver})
-    saveSetting()
+    CONFIG[sender] = CONFIG.get(sender, [])
+    CONFIG[sender].append({'to': receiver})
+    saveConfig()
     bot.sendMessage(msg['chat']['id'], 'subscribe success') 
 
 def handleSubscribe(msg):
@@ -111,16 +101,15 @@ def handleSubscribe(msg):
     if len(words) < 1:
         return
     command = words[0]
-    if not 'subscribe' in command.lower():
-        bot.sendMessage(msg['chat']['id'], HELP_MESSAGE)    
-        return
-    if len(words) != 3:
-        bot.sendMessage(msg['chat']['id'], HELP_MESSAGE)    
-        return
-    sender, receiver = map(formatChatRoomId, words[1:])
+    if not 'subscribe' in command.lower() or len(words) != 3:
+        return bot.sendMessage(msg['chat']['id'], HELP_MESSAGE)    
+    sender, receiver = map(formatAndCheckRoomId, words[1:])
+    if sender == None:
+        return bot.sendMessage(msg['chat']['id'], "FAIL. Sender Invalid")
+    if receiver == None:
+        return bot.sendMessage(msg['chat']['id'], "FAIL. receiver Invalid")    
     if 'unsubscribe' in command.lower():
-        handleUnsubscribeInternal(msg, sender, receiver)
-        return
+        return handleUnsubscribeInternal(msg, sender, receiver)
     handleSubscribeInternal(msg, sender, receiver)
 
 def getChatLink(msg):
@@ -143,21 +132,18 @@ def sendMessageDedup(receiver, msg):
     sended[message_identifier] = telepot.message_identifier(result)
 
 def handleGroup(msg):
-    if not 'username' in msg['chat']:
-        return
-    group = '@' + msg['chat']['username']
-    for config in SETTING.get(group, []):
-        sendMessageDedup(config['to'], msg)
+    for conf in CONFIG.get(msg['chat']['id'], []):
+        sendMessageDedup(conf['to'], msg)
 
 def handleLongChat(msg):
-    if 'forward_from_chat' in msg or not 'text' in msg:
+    if 'forward_from_chat' in msg or not 'text' in msg or len(msg['text']) < LONG_TEXT_LIMIT:
         return
-    if len(msg['text']) > LONG_TEXT_LIMIT:
-        sendMessageDedup(ADMIN_CHAT_ID, msg) 
+    sendMessageDedup(ADMIN_CHAT_ID, msg) 
 
 def handleExit(msg): # for debug use
     if 'text' in msg and msg['text'] == STOP_SECRET and msg['date'] > time.time() - 1:
         os.kill(os.getpid(), signal.SIGINT)
+        exit(0)
 
 def handle(msg):
     print msg # Debug use
