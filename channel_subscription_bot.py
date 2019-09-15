@@ -10,6 +10,12 @@ import time
 
 from telepot.loop import MessageLoop
 
+class SetEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, set):
+            return list(obj)
+        return json.JSONEncoder.default(self, obj)
+
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
@@ -30,7 +36,7 @@ except:
 
 def saveConfig():
     with open('CONFIG', 'w') as f:
-        f.write(json.dumps(CONFIG, sort_keys=True, indent=2))
+        f.write(json.dumps(CONFIG, sort_keys=True, indent=2, cls=SetEncoder))
 
 HELP_WORDS = ['help', '帮助', 'start']
 
@@ -44,6 +50,12 @@ Both of the channels/groups should add this bot as admin.
 channel/group can be room ID or room name.
 '''
 
+KEY_HELP = '''
+Experimental features:
+addKey - `addKey channel/group1 channel/group2 key` will add key to the subsription. Message will forward only when message text or msg sender match one of the keys.
+removeKey - `removeKey channel/group1 channel/group2` will remove all keys for this subscription.
+'''
+
 ADMIN_CHAT_ID = -1001198682178
 
 LONG_TEXT_LIMIT = 300
@@ -53,7 +65,15 @@ def handleHelp(msg):
         return
     if not any([word in msg['text'].lower() for word in HELP_WORDS]):
         return
-    bot.sendMessage(msg['chat']['id'], HELP_MESSAGE)    
+    bot.sendMessage(msg['chat']['id'], HELP_MESSAGE)   
+
+def getKey(d):
+    if not 'key' in d:
+        return set()
+    if isinstance(d['key'], set):
+        return d['key']
+    d['key'] = set(d['key'])
+    return d['key']
 
 def formatAndCheckRoomId(roomId):
     try:
@@ -68,20 +88,22 @@ def formatAndCheckRoomId(roomId):
     except:
         return None
 
-def getSubscriptionIndex(sender, receiver):
+def getSubscriptionIndex(sender, receiver, msg):
     if not sender in CONFIG:
+        bot.sendMessage(msg['chat']['id'], 'FAIL. NO SUCH SUBSCRIPTION')    
         return -1
     for index, conf in enumerate(CONFIG[sender]):
         if conf['to'] == receiver:
             break
     if conf['to'] == receiver:
         return index
+    bot.sendMessage(msg['chat']['id'], 'FAIL. NO SUCH SUBSCRIPTION')    
     return -1
 
 def handleUnsubscribeInternal(msg, sender, receiver):
-    index = getSubscriptionIndex(sender, receiver)
+    index = getSubscriptionIndex(sender, receiver, msg)
     if index == -1:
-        return bot.sendMessage(msg['chat']['id'], 'FAIL. NO SUCH SUBSCRIPTION')    
+        return  
     del CONFIG[sender][index]
     if len(CONFIG[sender]) == 0:
         del CONFIG[sender]  
@@ -94,23 +116,61 @@ def handleSubscribeInternal(msg, sender, receiver):
     saveConfig()
     bot.sendMessage(msg['chat']['id'], 'subscribe success') 
 
-def handleSubscribe(msg):
+def formatSenderReceiver(args, msg, help_message = HELP_MESSAGE):
+    if len(args) != 2:
+        return bot.sendMessage(msg['chat']['id'], help_message)  
+    sender, receiver = map(formatAndCheckRoomId, args)
+    if sender == None:
+        bot.sendMessage(msg['chat']['id'], "FAIL. Sender Invalid. Both groups/channels need to add this bot as admin.")
+        return None, None, False
+    if receiver == None:
+        bot.sendMessage(msg['chat']['id'], "FAIL. receiver Invalid. Both groups/channels need to add this bot as admin.")    
+        return None, None, false
+    return sender, receiver, True
+
+def handleSubsriebCommand(msg, words, command):
+    sender, receiver, success = formatSenderReceiver(words[1:3], msg)
+    if not success:
+        return 
+    if 'unsubscribe' in command:
+        return handleUnsubscribeInternal(msg, sender, receiver)
+    handleSubscribeInternal(msg, sender, receiver)
+
+def handleKeyCommand(msg, words, command):
+    sender, receiver, success = formatSenderReceiver(words[1:3], msg, help_message = KEY_HELP)
+    if not success:
+        return
+    index = getSubscriptionIndex(sender, receiver, msg)
+    if index == -1:
+        return 
+    if 'remove' in command:
+        if len(words) != 3:
+            return bot.sendMessage(msg['chat']['id'], KEY_HELP) 
+        del CONFIG[sender][index]['key']
+        saveConfig()
+        return bot.sendMessage(msg['chat']['id'], 'remove key success') 
+    if len(words) != 4:
+        return bot.sendMessage(msg['chat']['id'], KEY_HELP) 
+    key = words[3]
+    CONFIG[sender][index]['key'] = getKey(CONFIG[sender][index])
+    CONFIG[sender][index]['key'].add(key)
+    saveConfig()
+    return bot.sendMessage(msg['chat']['id'], 'add key success') 
+
+def handleConfigCommand(msg):
     if msg['chat']['type'] != 'private':
         return
     words = msg['text'].split()    
     if len(words) < 1:
         return
-    command = words[0]
-    if not 'subscribe' in command.lower() or len(words) != 3:
-        return bot.sendMessage(msg['chat']['id'], HELP_MESSAGE)    
-    sender, receiver = map(formatAndCheckRoomId, words[1:])
-    if sender == None:
-        return bot.sendMessage(msg['chat']['id'], "FAIL. Sender Invalid. Both groups/channels need to add this bot as admin.")
-    if receiver == None:
-        return bot.sendMessage(msg['chat']['id'], "FAIL. receiver Invalid. Both groups/channels need to add this bot as admin.")    
-    if 'unsubscribe' in command.lower():
-        return handleUnsubscribeInternal(msg, sender, receiver)
-    handleSubscribeInternal(msg, sender, receiver)
+    command = words[0].lower()
+    if 'subscribe' in command.lower() and len(words) == 3:
+        return handleSubsriebCommand(msg, words, command)
+    if 'key' in command.lower():
+        return handleKeyCommand(msg, words, command)
+
+    return bot.sendMessage(msg['chat']['id'], HELP_MESSAGE)    
+        
 
 def getChatLink(msg):
     return 't.me/' + msg['chat']['username'] + '/' + str(msg['message_id'])
@@ -131,9 +191,22 @@ def sendMessageDedup(receiver, msg):
     result = sendMessageSmart(receiver, msg)
     sended[message_identifier] = telepot.message_identifier(result)
 
+def satisfyKey(conf, msg):
+    conf['key'] = getKey(conf)
+    if 'first_name' in msg['from'] and msg['from']['first_name'].lower() in conf['key']:
+        return True
+    if 'text' in msg:
+        if len(msg['text']) > LONG_TEXT_LIMIT: # due to perfomance limitation, always forward long messages, these messages should be more valuable
+            return True
+        words = set(msg['text'].lower().split())
+        if len(words.intersection(conf['key'])) > 1:
+            return True
+    return False
+
 def handleGroup(msg):
     for conf in CONFIG.get(str(msg['chat']['id']), []):
-        sendMessageDedup(conf['to'], msg)
+        if not 'key' in conf or satisfyKey(conf, msg):
+            sendMessageDedup(conf['to'], msg)
 
 def handleLongChat(msg):
     if 'forward_from_chat' in msg or not 'text' in msg or len(msg['text']) < LONG_TEXT_LIMIT:
@@ -149,7 +222,7 @@ def handle(msg):
     print msg # Debug use
     handleExit(msg) # Debug use
     handleHelp(msg)
-    handleSubscribe(msg)
+    handleConfigCommand(msg)
     handleGroup(msg)
     handleLongChat(msg)
 
