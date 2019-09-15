@@ -105,9 +105,9 @@ def handleSubscribe(msg):
         return bot.sendMessage(msg['chat']['id'], HELP_MESSAGE)    
     sender, receiver = map(formatAndCheckRoomId, words[1:])
     if sender == None:
-        return bot.sendMessage(msg['chat']['id'], "FAIL. Sender Invalid")
+        return bot.sendMessage(msg['chat']['id'], "FAIL. Sender Invalid. Both groups/channels need to add this bot as admin.")
     if receiver == None:
-        return bot.sendMessage(msg['chat']['id'], "FAIL. receiver Invalid")    
+        return bot.sendMessage(msg['chat']['id'], "FAIL. receiver Invalid. Both groups/channels need to add this bot as admin.")    
     if 'unsubscribe' in command.lower():
         return handleUnsubscribeInternal(msg, sender, receiver)
     handleSubscribeInternal(msg, sender, receiver)
