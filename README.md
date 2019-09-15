@@ -20,7 +20,7 @@ First, you need to create a Telegram bot. Talk with the [BotFather](https://t.me
 
 Then, you need to add the `TOKEN` file with your token.
 
-The next part is to install in your server the requirements of the bot using `pip3 install -r requirements.txt`.
+The next part is to install in your server the requirements of the bot using `pip install -r requirements.txt`.
 
 Finally, adding it on all the relevent groups/channels, and talk to the bot to make subscription with them.
 
