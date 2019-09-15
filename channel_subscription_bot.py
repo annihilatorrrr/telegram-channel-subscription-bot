@@ -14,7 +14,7 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 
 with open('TOKEN') as f:
-    TOKEN = f.readline()
+    TOKEN = f.readline().strip()
 
 try:
     with open('CONFIG', 'r') as f:
