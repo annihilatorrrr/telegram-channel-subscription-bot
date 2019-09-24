@@ -22,10 +22,20 @@ sys.setdefaultencoding('utf-8')
 with open('TOKEN') as f:
     TOKEN = f.readline().strip()
 
+def formatConfig(config):
+    newConfig = {}
+    for key in config:
+        values = config[key]
+        for v in values:
+            v['to'] = int(v['to'])
+        newConfig[int(key)] = values
+    return newConfig
+
 try:
     with open('CONFIG', 'r') as f:
-        CONFIG = json.load(f)
-except:
+        CONFIG = formatConfig(json.load(f))
+except Exception as e:
+    print e
     CONFIG = {}
 
 try:
@@ -84,8 +94,9 @@ def formatAndCheckRoomId(roomId):
     try:
         result = bot.sendMessage(roomId, 'test') 
         bot.deleteMessage(telepot.message_identifier(result))
-        return str(result['chat']['id'])
-    except:
+        return result['chat']['id']
+    except Exception as e:
+        print e
         return None
 
 def getSubscriptionIndex(sender, receiver, msg):
@@ -204,7 +215,7 @@ def satisfyKey(conf, msg):
     return False
 
 def handleGroup(msg):
-    for conf in CONFIG.get(str(msg['chat']['id']), []):
+    for conf in CONFIG.get(msg['chat']['id'], []):
         if not 'key' in conf or satisfyKey(conf, msg):
             sendMessageDedup(conf['to'], msg)
 
