@@ -35,7 +35,7 @@ try:
     with open('CONFIG', 'r') as f:
         CONFIG = formatConfig(json.load(f))
 except Exception as e:
-    print(e)
+    print e
     CONFIG = {}
 
 try:
